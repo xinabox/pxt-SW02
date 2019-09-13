@@ -112,15 +112,15 @@ namespace SW02 {
 
     let mode = 0x01;
 
-    let tempcal: number;
-    let temperature_: number;
-    let humidity_: number;
-    let pressure_: number;
-    let altitude_: number;
-    let dewpoint_: number;
-    let gas: number;
-    let gas_res: number;
-    let t_fine: number;
+    let tempcal = 0;
+    let temperature_ = 0;
+    let humidity_ = 0;
+    let pressure_ = 0;
+    let altitude_ = 0;
+    let dewpoint_ = 0;
+    let gas = 0;
+    let gas_res = 0;
+    let t_fine = 0;
 
     function setreg(reg: number, dat: number): void {
         let buf = pins.createBuffer(2);
@@ -295,7 +295,6 @@ namespace SW02 {
             rawData = readBlock(BME680_REG_HUM_MSB, 2);
             readHumidity(((rawData[0] << 8) | rawData[1]));
 
-
             rawData = readBlock(BME680_REG_GAS_R_MSB, 2);
             readGas(((rawData[0] << 2 | (0xC0 & rawData[1]) >> 6)));
         }
@@ -384,7 +383,7 @@ namespace SW02 {
     }
 
     //% block="SW02 begin"
-    //% group= "On start"
+    //% group="On start"
     //% weight=76 blockGap=8
     export function begin() {
         reset();
@@ -403,7 +402,7 @@ namespace SW02 {
     export function temperature(u: Temperature): number {
         poll();
         temperature_ = temperature_ + tempcal;
-        temperature_ = Math.round(temperature_)
+        temperature_ = fix(temperature_)
         if (u == Temperature.Celcius) return temperature_;
         else return (32 + temperature_ * 9 / 5);
     }
@@ -412,7 +411,8 @@ namespace SW02 {
     //% group="Variables"
     //% weight=76 blockGap=8
     export function humidity(u: Humidity) {
-        return humidity_;
+        poll();
+        return fix(humidity_);
     }
 
     //% block="SW02 pressure"
@@ -468,7 +468,7 @@ namespace SW02 {
     //% weight=76 blockGap=8
     export function reset() {
         setreg(BME680_REG_RESET, 0xB6);
-        basic.pause(200)
+        basic.pause(100)
     }
 
     //% block="SW02 address %on"
