@@ -464,7 +464,7 @@ namespace SW02 {
     }
 
     //% block="SW02 reset"
-    //% group= "Optional"
+    //% group="Optional"
     //% weight=76 blockGap=8
     export function reset() {
         setreg(BME680_REG_RESET, 0xB6);
