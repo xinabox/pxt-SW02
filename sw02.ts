@@ -33,7 +33,7 @@ enum Length {
 /**
 * SW02 block
 */
-//% color=#444444 icon="\uf2dc"
+//% color=#444444 icon="\uf0ac"
 //% groups=['On start', 'Variables', 'Optional']
 namespace SW02 {
 
@@ -128,7 +128,7 @@ namespace SW02 {
         buf[1] = dat;
         pins.i2cWriteBuffer(BME680_I2C_ADDR, buf);
     }
-    
+
     function getreg(reg: number): number {
         pins.i2cWriteNumber(BME680_I2C_ADDR, reg, NumberFormat.UInt8BE);
         return pins.i2cReadNumber(BME680_I2C_ADDR, NumberFormat.UInt8BE);
@@ -228,6 +228,7 @@ namespace SW02 {
         var_ |= os_temp;
         setreg(BME680_REG_CNTL_MEAS, var_);
     }
+
     function setPressureOversampling() {
         let var_;
         var_ = getreg(BME680_REG_CNTL_MEAS);
@@ -235,6 +236,7 @@ namespace SW02 {
         var_ |= os_pres;
         setreg(BME680_REG_CNTL_MEAS, var_);
     }
+
     function setIIRFilterSize() {
         let var_;
         var_ = getreg(BME680_REG_CONFIG);
@@ -308,9 +310,6 @@ namespace SW02 {
         temperature_ = ((t_fine * 5 + 128) >> 8) / 100.0;
     }
 
-    /********************************************************
-          Read Pressure from BME680 Sensor 
-    *********************************************************/
     function readPressure(adc_pres: number) {
         let var1 = 0;
         let var2 = 0;
@@ -343,9 +342,6 @@ namespace SW02 {
         pressure_ = pressure_comp;
     }
 
-    /********************************************************
-          Read Humidity from BME680 Sensor 
-    *********************************************************/
     function readHumidity(adc_hum: number) {
         let var1;
         let var2;
@@ -355,38 +351,22 @@ namespace SW02 {
         let var6;
         let temp_scaled;
         let calc_hum;
-
         temp_scaled = ((t_fine * 5) + 128) >> 8;
-
-        var1 = (adc_hum - (par_h1 << 4))
-            - (((temp_scaled * par_h3) / (100)) >> 1);
-
-        var2 = (par_h2 * (((temp_scaled * par_h4) /
-            (100)) + (((temp_scaled * ((temp_scaled * par_h5) /
-                (100))) >> 6) / (100)) + (1 << 14))) >> 10;
-
+        var1 = (adc_hum - (par_h1 << 4)) - (((temp_scaled * par_h3) / (100)) >> 1);
+        var2 = (par_h2 * (((temp_scaled * par_h4) / (100)) + (((temp_scaled * ((temp_scaled * par_h5) / (100))) >> 6) / (100)) + (1 << 14))) >> 10;
         var3 = var1 * var2;
-
         var4 = (((par_h6) << 7) + ((temp_scaled * par_h7) / (100))) >> 4;
-
         var5 = ((var3 >> 14) * (var3 >> 14)) >> 10;
-
         var6 = (var4 * var5) >> 1;
-
         calc_hum = (((var3 + var6) >> 10) * (1000)) >> 12;
-
         if (calc_hum > 102400) {
             calc_hum = 102400;
         } else if (calc_hum < 0) {
             calc_hum = 0;
         }
-
         humidity_ = (calc_hum / 1024.0);
     }
 
-    /********************************************************
-          Read Gas Level from BME680 Sensor 
-    *********************************************************/
     function readGas(resVal: number) {
         let const_array1: number[] = [1, 1, 1, 1, 1, 0.99, 1, 0.992, 1, 1, 0.998, 0.995, 1, 0.99, 1, 1];
         let const_array2: number[] = [
@@ -403,14 +383,6 @@ namespace SW02 {
         gas_res = var1 * const_array2[gasRange] / (resVal - 512.0 + var1);
     }
 
-    //% block="SW02 reset"
-    //% group= "Optional"
-    //% weight=76 blockGap=8
-    export function reset() {
-        setreg(BME680_REG_RESET, 0xB6);
-        basic.pause(200)
-    }
-
     //% block="SW02 begin"
     //% group= "On start"
     //% weight=76 blockGap=8
@@ -425,29 +397,13 @@ namespace SW02 {
         setreg(BME680_REG_CNTL_MEAS, mode);
     }
 
-    //% block="SW02 set temperature calibration"
-    //% group="Optional"
-    //% weight=76 blockGap=8
-    function setTempCal(offset: number) {
-        tempcal = offset;
-    }
-
-    //% block="SW02 power $on"
-    //% group="Optional"
-    //% weight=98 blockGap=8
-    //% on.shadow="toggleOnOff"
-    export function onOff(on: boolean) {
-        if (on) setreg(0x74, 0x01);
-        else setreg(0x74, 0x00)
-    }
-
     //% block="SW02 temperature %u"
     //% group="Variables"
     //% weight=76 blockGap=8
     export function temperature(u: Temperature): number {
         poll();
         temperature_ = temperature_ + tempcal;
-        temperature_ = fix(temperature_)
+        temperature_ = Math.round(temperature_)
         if (u == Temperature.Celcius) return temperature_;
         else return (32 + temperature_ * 9 / 5);
     }
@@ -455,8 +411,7 @@ namespace SW02 {
     //% block="SW02 humidity %u"
     //% group="Variables"
     //% weight=76 blockGap=8
-    export function humidity(u: Humidity)
-    {
+    export function humidity(u: Humidity) {
         return humidity_;
     }
 
@@ -508,6 +463,14 @@ namespace SW02 {
         return IAQ;
     }
 
+    //% block="SW02 reset"
+    //% group= "Optional"
+    //% weight=76 blockGap=8
+    export function reset() {
+        setreg(BME680_REG_RESET, 0xB6);
+        basic.pause(200)
+    }
+
     //% block="SW02 address %on"
     //% group="Optional"
     //% weight=50 blockGap=8
@@ -517,7 +480,23 @@ namespace SW02 {
         else BME680_I2C_ADDR = 0x77
     }
 
+    //% block="SW02 set temperature calibration"
+    //% group="Optional"
+    //% weight=76 blockGap=8
+    export function setTempCal(offset: number) {
+        tempcal = offset;
+    }
+
+    //% block="SW02 power $on"
+    //% group="Optional"
+    //% weight=98 blockGap=8
+    //% on.shadow="toggleOnOff"
+    export function onOff(on: boolean) {
+        if (on) setreg(0x74, 0x01);
+        else setreg(0x74, 0x00)
+    }
+
     function fix(x: number) {
         return Math.round(x * 100) / 100
     }
-} 
+}
