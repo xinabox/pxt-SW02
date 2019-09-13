@@ -1,0 +1,18 @@
+{
+    "SW02.pressure|block": "气压 %u",
+    "SW02.temperature|block": "温度 %u",
+    "SW02.humidity|block": "湿度",
+    "SW02.Power|block": "开启传感器",
+    "SW02.PowerOn|block": "开启传感器",
+    "SW02.PowerOff|block": "关闭传感器",
+    "SW02.Dewpoint|block": "露点",
+    "SW02.PressureBelowThan|block": "气压低于 %dat",
+    "SW02.PressureHigherThan|block": "气压高于 %dat",
+    "SW02.HumidityBelowThan|block": "湿度低于 %dat",
+    "SW02.HumidityHigherThan|block": "湿度高于 %dat",
+    "SW02.TemperatureBelowThan|block": "温度低于 %dat",
+    "SW02.TemperatureHigherThan|block": "温度高于 %dat",
+    "SW02.altitude|block": "高度",
+    "SW02.cloudbase|block": "云层高度",
+    "SW02.Address|block": "设置地址 %addr"
+}
