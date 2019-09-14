@@ -1,6 +1,6 @@
 /**
  * XinaBox SW02 extension for makecode
- * Base on BME680 C libary from Bosch Sensortec.
+ * Based on BME680 C libary from Bosch Sensortec.
  *   https://github.com/BoschSensortec/BME680_driver
  */
 
@@ -95,22 +95,22 @@ namespace SW02 {
     let par_gh2 = 0;
     let par_gh3 = 0;
 
-    let res_heat_range = 0;
-    let res_heat_val = 0;
-    let range_sw_err = 0;
+    let res_heat_range = 0x00;
+    let res_heat_val = 0x00;
+    let range_sw_err = 0x00;
 
-    let os_hum = 0x01;
-    let os_temp = 0x40;
-    let os_pres = 0x14;
+    let os_hum = 0x00;
+    let os_temp = 0x00;
+    let os_pres = 0x00;
     let filter = 0x00;
 
-    let heatr_dur = 0x0059;
+    let heatr_dur = 0x0000;
     let heatr_temp = 0x0000;
     let nb_conv = 0x00;
     let run_gas = 0x00;
     let heatr_ctrl = 0x00;
 
-    let mode = 0x01;
+    let mode = 0;
 
     let tempcal = 0;
     let temperature_ = 0;
@@ -173,31 +173,31 @@ namespace SW02 {
         calib_data = calib_data.concat(calib_data2);
 
         par_t1 = (calib_data[34] << 8) | calib_data[33];
-        par_t2 = (calib_data[2] << 8) | calib_data[1];
-        par_t3 = (calib_data[3]);
+        par_t2 = pos2neg((calib_data[2] << 8) | calib_data[1]);
+        par_t3 = pos2neg((calib_data[3]));
 
         par_p1 = (calib_data[6] << 8) | calib_data[5];
-        par_p2 = (calib_data[8] << 8) | calib_data[7];
-        par_p3 = (calib_data[9]);
-        par_p4 = (calib_data[12] << 8) | calib_data[11];
-        par_p5 = (calib_data[14] << 8) | calib_data[13];
-        par_p6 = (calib_data[16]);
-        par_p7 = (calib_data[15]);
-        par_p8 = (calib_data[20] << 8) | calib_data[19];
-        par_p9 = (calib_data[22] << 8) | calib_data[21];
+        par_p2 = pos2neg((calib_data[8] << 8) | calib_data[7]);
+        par_p3 = pos2neg((calib_data[9]));
+        par_p4 = pos2neg((calib_data[12] << 8) | calib_data[11]);
+        par_p5 = pos2neg((calib_data[14] << 8) | calib_data[13]);
+        par_p6 = pos2neg((calib_data[16]));
+        par_p7 = pos2neg((calib_data[15]));
+        par_p8 = pos2neg((calib_data[20] << 8) | calib_data[19]);
+        par_p9 = pos2neg((calib_data[22] << 8) | calib_data[21]);
         par_p10 = (calib_data[23]);
 
         par_h1 = (calib_data[27] << 4) | (calib_data[26] & 0x0F);
         par_h2 = (calib_data[25] << 4) | (calib_data[26] >> 4);
-        par_h3 = calib_data[28];
-        par_h4 = calib_data[29];
-        par_h5 = calib_data[30];
+        par_h3 = pos2neg(calib_data[28]);
+        par_h4 = pos2neg(calib_data[29]);
+        par_h5 = pos2neg(calib_data[30]);
         par_h6 = calib_data[31];
         par_h7 = calib_data[32];
 
-        par_gh1 = calib_data[37];
-        par_gh2 = (calib_data[36] << 8) | calib_data[35];
-        par_gh3 = calib_data[38];
+        par_gh1 = pos2neg(calib_data[37]);
+        par_gh2 = pos2neg((calib_data[36] << 8) | calib_data[35]);
+        par_gh3 = pos2neg(calib_data[38]);
 
         res_heat_range = calib_data[39];
         res_heat_val = calib_data[40];
@@ -259,14 +259,14 @@ namespace SW02 {
         let par_g1 = (getreg(0xEC) << 8) | getreg(0xEB);
         let par_g2 = getreg(0xED);
         let par_g3 = getreg(0xEE);
-        let res_heat_range = (getreg(0x02) & 0x30) >> 4;
-        let res_heat_val = getreg(0x00);
+        let res_heat_range_ = (getreg(0x02) & 0x30) >> 4;
+        let res_heat_val_ = getreg(0x00);
         var1 = (par_g1 / 16.0) + 49.0;
         var2 = ((par_g2 / 32768.0) * 0.0005) + 0.00235;
         var3 = par_g3 / 1024.0;
         var4 = var1 * (1.0 + (var2 * set_point));
         var5 = var4 + (var3 * 25.0); // use 25 C as ambient temperature_
-        res_heat_x = (((var5 * (4.0 / (4.0 * res_heat_range))) - 25.0) * 3.4 / ((res_heat_val * 0.002) + 1));
+        res_heat_x = (((var5 * (4.0 / (4.0 * res_heat_range_))) - 25.0) * 3.4 / ((res_heat_val_ * 0.002) + 1));
         return res_heat_x;
     }
 
@@ -285,12 +285,12 @@ namespace SW02 {
             triggerForced();
 
             let rawData: number[] = [];
+            rawData = readBlock(BME680_REG_PRES_MSB, 3);
+            readPressure(((rawData[0] << 16 | rawData[1] << 8 | rawData[2]) >> 4));
 
             rawData = readBlock(BME680_REG_TEMP_MSB, 3);
             readTemperature(((rawData[0] << 16 | rawData[1] << 8 | rawData[2]) >> 4));
 
-            rawData = readBlock(BME680_REG_PRES_MSB, 3);
-            readPressure(((rawData[0] << 16 | rawData[1] << 8 | rawData[2]) >> 4));
 
             rawData = readBlock(BME680_REG_HUM_MSB, 2);
             readHumidity(((rawData[0] << 8) | rawData[1]));
@@ -410,17 +410,18 @@ namespace SW02 {
     //% block="SW02 humidity %u"
     //% group="Variables"
     //% weight=76 blockGap=8
-    export function humidity(u: Humidity) {
+    export function humidity(u: Humidity): number {
         poll();
         return fix(humidity_);
     }
 
-    //% block="SW02 pressure"
+    //% block="SW02 pressure %u"
     //% group="Variables"
     //% weight=76 blockGap=8
-    export function pressure() {
+    export function pressure(u: Pressure): number {
         poll();
-        return pressure_;
+        if (u == Pressure.HectoPascal) return fix(pressure_/100);
+        else return fix(pressure_);
     }
 
     //% block="SW02 pressure altitude"
@@ -470,7 +471,15 @@ namespace SW02 {
         setreg(BME680_REG_RESET, 0xB6);
         basic.pause(100)
     }
-
+    
+    //% block="SW02 power $on"
+    //% group="Optional"
+    //% weight=98 blockGap=8
+    //% on.shadow="toggleOnOff"
+    export function onOff(on: boolean) {
+        if (on) setreg(0x74, 0x01);
+        else setreg(0x74, 0x00)
+    }
     //% block="SW02 address %on"
     //% group="Optional"
     //% weight=50 blockGap=8
@@ -487,16 +496,20 @@ namespace SW02 {
         tempcal = offset;
     }
 
-    //% block="SW02 power $on"
-    //% group="Optional"
-    //% weight=98 blockGap=8
-    //% on.shadow="toggleOnOff"
-    export function onOff(on: boolean) {
-        if (on) setreg(0x74, 0x01);
-        else setreg(0x74, 0x00)
-    }
-
     function fix(x: number) {
         return Math.round(x * 100) / 100
+    }
+
+    function pos2neg(val: number): number {
+        if (val <= 255) {
+            if (((val >> 7) & 0x01) == 0x01) {
+                val = -(256 - val)
+            }
+        } else if (val <= 65535 && val >= 255) {
+            if (((val >> 15) & 0x01) == 0x01) {
+                val = -(65536 - val)
+            }
+        }
+        return val
     }
 }
