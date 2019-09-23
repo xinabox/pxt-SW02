@@ -488,11 +488,8 @@ namespace SW02 {
         if (on) BME680_I2C_ADDR = 0x76
         else BME680_I2C_ADDR = 0x77
     }
-
-    //% block="SW02 set temperature calibration"
-    //% group="Optional"
-    //% weight=76 blockGap=8
-    export function setTempCal(offset: number) {
+    
+    function setTempCal(offset: number) {
         tempcal = offset;
     }
 
