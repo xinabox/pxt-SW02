@@ -39,34 +39,34 @@ namespace SW02 {
 
     let BME680_I2C_ADDR = 0x76
 
-    const BME680_REG_STATUS = 0x73
-    const BME680_REG_RESET = 0xE0
-    const BME680_REG_ID = 0xD0
-    const BME680_REG_CONFIG = 0x75
+    // const BME680_REG_STATUS = 0x73
+    // const BME680_REG_RESET = 0xE0
+    // const BME680_REG_ID = 0xD0
+    // const BME680_REG_CONFIG = 0x75
 
-    const BME680_REG_CNTL_MEAS = 0x74
-    const BME680_REG_CNTL_HUM = 0x72
-    const BME680_REG_CNTL_GAS_1 = 0x71
-    const BME680_REG_CNTL_GAS_0 = 0x70
+    // const BME680_REG_CNTL_MEAS = 0x74
+    // const BME680_REG_CNTL_HUM = 0x72
+    // const BME680_REG_CNTL_GAS_1 = 0x71
+    // const BME680_REG_CNTL_GAS_0 = 0x70
 
-    const BME680_REG_GAS_WAIT0 = 0x64
-    const BME680_REG_RES_HEAT0 = 0x5A
-    const BME680_REG_IDAC_HEAT0 = 0x50
+    // const BME680_REG_GAS_WAIT0 = 0x64
+    // const BME680_REG_RES_HEAT0 = 0x5A
+    // const BME680_REG_IDAC_HEAT0 = 0x50
 
-    const BME680_REG_GAS_R_LSB = 0x2B
-    const BME680_REG_GAS_R_MSB = 0x2A
-    const BME680_REG_HUM_LSB = 0x26
-    const BME680_REG_HUM_MSB = 0x25
-    const BME680_REG_TEMP_XLSB = 0x24
-    const BME680_REG_TEMP_LSB = 0x23
-    const BME680_REG_TEMP_MSB = 0x22
-    const BME680_REG_PRES_XLSB = 0x21
-    const BME680_REG_PRES_XMSB = 0x20
-    const BME680_REG_PRES_MSB = 0x1F
-    const BME680_REG_FIELD0_ADDR = 0x1D
+    // const BME680_REG_GAS_R_LSB = 0x2B
+    // const BME680_REG_GAS_R_MSB = 0x2A
+    // const BME680_REG_HUM_LSB = 0x26
+    // const BME680_REG_HUM_MSB = 0x25
+    // const BME680_REG_TEMP_XLSB = 0x24
+    // const BME680_REG_TEMP_LSB = 0x23
+    // const BME680_REG_TEMP_MSB = 0x22
+    // const BME680_REG_PRES_XLSB = 0x21
+    // const BME680_REG_PRES_XMSB = 0x20
+    // const BME680_REG_PRES_MSB = 0x1F
+    // const BME680_REG_FIELD0_ADDR = 0x1D
 
-    const BME680_REG_CALIB_DATA_1 = 0x89
-    const BME680_REG_CALIB_DATA_2 = 0xE1
+    // const BME680_REG_CALIB_DATA_1 = 0x89
+    // const BME680_REG_CALIB_DATA_2 = 0xE1
 
     let par_t1 = 0;
     let par_t2 = 0;
@@ -119,8 +119,35 @@ namespace SW02 {
     let altitude_ = 0;
     let dewpoint_ = 0;
     let gas = 0;
-    let gas_res = 0;
+    let gas_res = 0.0;
     let t_fine = 0;
+
+
+    let _err_measure = 2;
+    let _err_estimate = 2;
+    let _q = 0.01;
+    let _current_estimate = 0.0;
+    let _last_estimate = 0.0;
+    let _kalman_gain = 0.0;
+
+    let aF = 0;
+    let bme680VocValid = false;
+    let bDelay = 0;
+    let bme680_baseC = 0;
+    let bme680_baseH = 0;
+    let resFiltered;
+    let tVoc = 0;
+
+    let t_offset = -.5;                 // offset temperature sensor
+    let h_offset = 1.5;                 // offset humitidy sensor  
+    let vocBaseR = 0;                   // base value for VOC resistance clean air, abc 
+    let vocBaseC = 0;                   // base value for VOC resistance clean air, abc  
+    let vocHum = 0.0;                   // reserved, abc
+    let signature = 0x49415143;
+
+    let voc = 0;
+    let vocEst = 0.0;
+    let isValidIAQ = false;
 
     function setreg(reg: number, dat: number): void {
         let buf = pins.createBuffer(2);
@@ -167,8 +194,8 @@ namespace SW02 {
         let calib_data2: number[] = [];
         let calib_data: number[] = [];
 
-        calib_data1 = readBlock(BME680_REG_CALIB_DATA_1, 25);
-        calib_data2 = readBlock(BME680_REG_CALIB_DATA_2, 16);
+        calib_data1 = readBlock(0x89, 25);
+        calib_data2 = readBlock(0xE1, 16);
         calib_data = calib_data.concat(calib_data1);
         calib_data = calib_data.concat(calib_data2);
 
@@ -216,48 +243,39 @@ namespace SW02 {
 
         mode = 0x01;
     }
-
-    function setHumidityOversampling() {
-        setreg(BME680_REG_CNTL_HUM, os_hum);
+    function updateEstimate(mea: number): number {
+        _kalman_gain = _err_estimate / (_err_estimate + _err_measure);
+        _current_estimate = _last_estimate + _kalman_gain * (mea - _last_estimate);
+        _err_estimate = (1.0 - _kalman_gain) * _err_estimate + Math.abs(_last_estimate - _current_estimate) * _q;
+        _last_estimate = _current_estimate;
+        return _current_estimate;
     }
 
-    function setTemperatureOversampling() {
-        let var_;
-        var_ = getreg(BME680_REG_CNTL_MEAS);
-
-        var_ |= os_temp;
-        setreg(BME680_REG_CNTL_MEAS, var_);
+    function setMeasurementError(mea_e: number): void {
+        _err_measure = mea_e;
     }
 
-    function setPressureOversampling() {
-        let var_;
-        var_ = getreg(BME680_REG_CNTL_MEAS);
-
-        var_ |= os_pres;
-        setreg(BME680_REG_CNTL_MEAS, var_);
+    function setEstimateError(est_e: number): void {
+        _err_estimate = est_e;
     }
 
-    function setIIRFilterSize() {
-        let var_;
-        var_ = getreg(BME680_REG_CONFIG);
-
-        var_ |= filter;
-        setreg(BME680_REG_CONFIG, var_);
+    function setProcessNoise(q: number): void {
+        _q = q;
     }
 
-    function initGasSensor(resHeat: number) {
-        // Configure the BME680 Gas Sensor
-        setreg(BME680_REG_CNTL_GAS_1, 0x10);
-        // Set gas sampling wait time and target heater resistance
-        setreg((BME680_REG_GAS_WAIT0), 1 | 0x59);
-        setreg((BME680_REG_RES_HEAT0), resHeat);
+    function getKalmanGain(): number {
+        return _kalman_gain;
+    }
+
+    function getEstimateError(): number {
+        return _err_estimate;
     }
 
     function setGasHeater(set_point: number): number {
         let res_heat_x = 0;
         let var1 = 0.0, var2 = 0.0, var3 = 0.0, var4 = 0.0, var5 = 0.0;
-        let par_g1 = (getreg(0xEC) << 8) | getreg(0xEB);
-        let par_g2 = getreg(0xED);
+        let par_g1 = getreg(0xED);
+        let par_g2 = (getreg(0xEC) << 8) | getreg(0xEB);
         let par_g3 = getreg(0xEE);
         let res_heat_range_ = (getreg(0x02) & 0x30) >> 4;
         let res_heat_val_ = getreg(0x00);
@@ -265,38 +283,169 @@ namespace SW02 {
         var2 = ((par_g2 / 32768.0) * 0.0005) + 0.00235;
         var3 = par_g3 / 1024.0;
         var4 = var1 * (1.0 + (var2 * set_point));
-        var5 = var4 + (var3 * 25.0); // use 25 C as ambient temperature_
-        res_heat_x = (((var5 * (4.0 / (4.0 * res_heat_range_))) - 25.0) * 3.4 / ((res_heat_val_ * 0.002) + 1));
+        var5 = var4 + (var3 * 25.0); // use 25 C as ambient temperature
+        res_heat_x = (3.4 * ((var5 * (4.0 / (4.0 + res_heat_range_)) * (1.0 / (1.0 + (res_heat_val_ * 0.002)))) - 25));
         return res_heat_x;
     }
+
+    function readVOC(): boolean {
+
+        let t = 0.0;
+        let h = 0.0;
+        let r = 0.0;
+        t = temperature(Temperature.Celcius);
+        h = humidity(Humidity.RelativeHumidity);
+        let a = absHum(t, h);
+        aF = (aF == 0 || a < aF) ? a : aF + 0.2 * (a - aF);
+        voc = 0.0;
+        vocEst = 0.0;
+        r = getGasRes();
+        let base = bme680Abc(r, a);
+        resFiltered = r;        // preload low pass filter
+        bme680VocValid = true;
+        isValidIAQ = true;
+        resFiltered += 0.1 * (r - resFiltered);
+        let ratio = base / (r * aF * 7.0);
+        let tV = (1250 * Math.log(ratio)) + 125;                     // approximation    
+        let tV2 = tVoc + 0.1 * (tV - tVoc);
+        tVoc = tVoc == 0 ? tV : tV2;       // global tVoc
+        voc = tVoc;
+        // let tvoc_estimated_value = 0.0;
+        // if (tVoc > 0) {
+        //     tvoc_estimated_value = updateEstimate(tVoc);
+        // } else {
+        //     tvoc_estimated_value = 0;
+        // }
+        // vocEst = tvoc_estimated_value;
+        return true;
+    }
+
+    //% block="SW02 TVOC"
+    //% group="Optional"
+    //% weight=76 blockGap=8
+    export function TVOC(): number {
+        poll();
+        return voc * 1000.0;
+    }
+
+    function getTVOCFiltered(): number {
+        return vocEst * 1000.0;
+    }
+
+    function bme680Abc(r: number, a: number) {
+        //--- automatic baseline correction
+        let b = r * a * 7.0;
+        if (b > bme680_baseC && bDelay > 5) {
+            //--- ensure that new baseC is stable for at least >5*10sec (clean air)
+            bme680_baseC = b;
+            bme680_baseH = a;
+        } else if (b > bme680_baseC) {
+            bDelay++;
+            //return b;
+        } else {
+            bDelay = 0;
+        }
+
+        return (vocBaseC > bme680_baseC) ? vocBaseC : bme680_baseC;
+    }
+
+    function absHum(temp: number, hum: number): number {
+        let sdd, dd = 0.0;
+        sdd = 6.1078 * Math.pow(10, (7.5 * temp) / (237.3 + temp));
+        dd = hum / 100.0 * sdd;
+        return 216.687 * dd / (273.15 + temp);
+    }
+    /********************************************************
+            Read Gas Resistance from BME680 Sensor in Ohms  
+    *********************************************************/
+    //% block="SW02 gas resistance"
+    //% group="Optional"
+    //% weight=76 blockGap=8
+    export function getGasRes(): number {
+        poll();
+        return Math.round(gas_res);
+    }
+    function setHumidityOversampling() {
+        setreg(0x72, os_hum);
+    }
+
+    function setTemperatureOversampling() {
+        let var_;
+        var_ = getreg(0x74);
+
+        var_ |= os_temp;
+        setreg(0x74, var_);
+    }
+
+    function setPressureOversampling() {
+        let var_;
+        var_ = getreg(0x74);
+
+        var_ |= os_pres;
+        setreg(0x74, var_);
+    }
+
+    function setIIRFilterSize() {
+        let var_;
+        var_ = getreg(0x75);
+
+        var_ |= filter;
+        setreg(0x75, var_);
+    }
+
+    function initGasSensor(resHeat: number) {
+        // Configure the BME680 Gas Sensor
+        setreg(0x71, 0x10);
+        // Set gas sampling wait time and target heater resistance
+        setreg((0x64), 1 | 0x59);
+        setreg((0x5A), resHeat);
+    }
+
+    // function setGasHeater(set_point: number): number {
+    //     let res_heat_x = 0;
+    //     let var1 = 0.0, var2 = 0.0, var3 = 0.0, var4 = 0.0, var5 = 0.0;
+    //     let par_g1 = (getreg(0xEC) << 8) | getreg(0xEB);
+    //     let par_g2 = getreg(0xED);
+    //     let par_g3 = getreg(0xEE);
+    //     let res_heat_range_ = (getreg(0x02) & 0x30) >> 4;
+    //     let res_heat_val_ = getreg(0x00);
+    //     var1 = (par_g1 / 16.0) + 49.0;
+    //     var2 = ((par_g2 / 32768.0) * 0.0005) + 0.00235;
+    //     var3 = par_g3 / 1024.0;
+    //     var4 = var1 * (1.0 + (var2 * set_point));
+    //     var5 = var4 + (var3 * 25.0); // use 25 C as ambient temperature_
+    //     res_heat_x = (((var5 * (4.0 / (4.0 * res_heat_range_))) - 25.0) * 3.4 / ((res_heat_val_ * 0.002) + 1));
+    //     return res_heat_x;
+    // }
 
     function triggerForced() {
         let var_ = 0;
         var_ |= os_temp;
         var_ |= os_pres;
         var_ |= mode;
-        setreg(BME680_REG_CNTL_MEAS, var_);
+        setreg(0x74, var_);
     }
 
     function poll() {
-        let status = getreg(BME680_REG_FIELD0_ADDR);
+        let status = getreg(0x1D);
 
         if (status & 0x80) {
             triggerForced();
 
             let rawData: number[] = [];
-            rawData = readBlock(BME680_REG_PRES_MSB, 3);
+            rawData = readBlock(0x1F, 3);
             readPressure(((rawData[0] << 16 | rawData[1] << 8 | rawData[2]) >> 4));
 
-            rawData = readBlock(BME680_REG_TEMP_MSB, 3);
+            rawData = readBlock(0x22, 3);
             readTemperature(((rawData[0] << 16 | rawData[1] << 8 | rawData[2]) >> 4));
 
-
-            rawData = readBlock(BME680_REG_HUM_MSB, 2);
+            rawData = readBlock(0x25, 2);
             readHumidity(((rawData[0] << 8) | rawData[1]));
 
-            rawData = readBlock(BME680_REG_GAS_R_MSB, 2);
+            rawData = readBlock(0x2A, 2);
             readGas(((rawData[0] << 2 | (0xC0 & rawData[1]) >> 6)));
+
+            readVOC();
         }
     }
 
@@ -372,7 +521,7 @@ namespace SW02 {
             8000000.0, 4000000.0, 2000000.0, 1000000.0, 499500.4995, 248262.1648, 125000.0,
             63004.03226, 31281.28128, 15625.0, 7812.5, 3906.25, 1953.125, 976.5625, 488.28125, 244.140625];
 
-        let gasRange = getreg(BME680_REG_GAS_R_LSB);
+        let gasRange = getreg(0x2B);
         gasRange &= 0x0F;
 
         let range_switch_error = getreg(0x04);
@@ -392,8 +541,8 @@ namespace SW02 {
         setTemperatureOversampling();
         setPressureOversampling();
         setIIRFilterSize();
-        initGasSensor(setGasHeater(200));
-        setreg(BME680_REG_CNTL_MEAS, mode);
+        initGasSensor(setGasHeater(250));
+        setreg(0x74, mode);
     }
 
     //% block="SW02 temperature %u"
@@ -420,7 +569,7 @@ namespace SW02 {
     //% weight=76 blockGap=8
     export function pressure(u: Pressure): number {
         poll();
-        if (u == Pressure.HectoPascal) return fix(pressure_/100);
+        if (u == Pressure.HectoPascal) return fix(pressure_ / 100);
         else return fix(pressure_);
     }
 
@@ -468,10 +617,10 @@ namespace SW02 {
     //% group="Optional"
     //% weight=76 blockGap=8
     export function reset() {
-        setreg(BME680_REG_RESET, 0xB6);
+        setreg(0xE0, 0xB6);
         basic.pause(100)
     }
-    
+
     //% block="SW02 power $on"
     //% group="Optional"
     //% weight=98 blockGap=8
@@ -488,7 +637,7 @@ namespace SW02 {
         if (on) BME680_I2C_ADDR = 0x76
         else BME680_I2C_ADDR = 0x77
     }
-    
+
     function setTempCal(offset: number) {
         tempcal = offset;
     }
