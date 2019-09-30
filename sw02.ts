@@ -4,39 +4,37 @@
  *   https://github.com/BoschSensortec/BME680_driver
  */
 
-enum Temperature {
-    //% block="ºC"
-    Celcius = 0,
-    //% block="ºF"
-    Fahrenheit = 1
-}
-
-enum Pressure {
-    //% block="hPa"
-    HectoPascal = 0,
-    //% block="mbar"
-    MilliBar = 1
-}
-
-enum Humidity {
-    //% block="%RH"
-    RelativeHumidity = 0
-}
-
-enum Length {
-    //% block="meter"
-    Meter = 0,
-    //% block="feet"
-    Feet = 1
-}
-
 /**
 * SW02 block
 */
 //% color=#444444 icon="\uf0ac"
 //% groups=['On start', 'Variables', 'Optional']
 namespace SW02 {
+    export enum Temperature {
+        //% block="ºC"
+        Celcius = 0,
+        //% block="ºF"
+        Fahrenheit = 1
+    }
 
+    export enum Pressure {
+        //% block="hPa"
+        HectoPascal = 0,
+        //% block="mbar"
+        MilliBar = 1
+    }
+
+    export enum Humidity {
+        //% block="%RH"
+        RelativeHumidity = 0
+    }
+
+    export enum Length {
+        //% block="meter"
+        Meter = 0,
+        //% block="feet"
+        Feet = 1
+    }
     let BME680_I2C_ADDR = 0x76
 
     // const BME680_REG_STATUS = 0x73
