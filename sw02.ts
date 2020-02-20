@@ -318,13 +318,13 @@ namespace SW02 {
         return true;
     }
 
-    //% block="SW02 TVOC"
-    //% group="Optional"
-    //% weight=76 blockGap=8
-    export function TVOC(): number {
-        poll();
-        return voc * 1000.0;
-    }
+//     //% block="SW02 TVOC"
+//     //% group="Optional"
+//     //% weight=76 blockGap=8
+//     export function TVOC(): number {
+//         poll();
+//         return voc * 1000.0;
+//     }
 
     function getTVOCFiltered(): number {
         return vocEst * 1000.0;
@@ -443,7 +443,7 @@ namespace SW02 {
             rawData = readBlock(0x2A, 2);
             readGas(((rawData[0] << 2 | (0xC0 & rawData[1]) >> 6)));
 
-            readVOC();
+            //readVOC();
         }
     }
 
@@ -600,15 +600,6 @@ namespace SW02 {
             / (17.625 - Math.log(humidity_ / 100.0) - ((17.625 * temperature_) / (243.04 + temperature_)));
         if (u == Temperature.Celcius) return dewpoint_;
         else return (32 + (dewpoint_) * 9 / 5);
-    }
-
-    //% block="SW02 IAQ"
-    //% group="Variables"
-    //% weight=76 blockGap=8
-    export function getIAQ() {
-        let IAQ: number;
-
-        return IAQ;
     }
 
     //% block="SW02 reset"
